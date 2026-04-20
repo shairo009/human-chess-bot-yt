@@ -16,44 +16,67 @@ with open("prompt.txt") as f:
 
 TONES = ["Shock 😱", "Funny 😂", "Savage 😈", "Smart 😎"]
 
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
-LICHESS_USERNAME   = os.environ.get("LICHESS_USERNAME", config.get("lichess_username", ""))
+OPENROUTER_API_KEY  = os.environ.get("OPENROUTER_API_KEY", "")
+ELEVENLABS_API_KEY  = os.environ.get("ELEVENLABS_API_KEY", "")
 ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", config.get("elevenlabs_voice_id", ""))
 YOUTUBE_CHANNEL_ID  = os.environ.get("YOUTUBE_CHANNEL_ID", config.get("youtube_channel_id", ""))
 
+# Famous top Lichess players - zero touch, random pick
+TOP_PLAYERS = [
+    "DrNykterstein",   # Magnus Carlsen
+    "nihalsarin",      # Nihal Sarin
+    "DanielNaroditsky",
+    "penguingim1",     # Andrew Tang
+    "alireza2003",     # Alireza Firouzja
+    "RebeccaHarris",   # Hikaru (one of his accounts)
+    "LyonBeast",
+    "Zhigalko_Sergei",
+    "Baskaran_Adhiban",
+    "rpragchess",      # Praggnanandhaa
+    "vincentkeymer",
+    "mishanick",
+    "Firouzja2003",
+]
 
-def fetch_lichess_game():
-    url = f"https://lichess.org/api/games/user/{LICHESS_USERNAME}?max=20&analysed=true&evals=true"
+
+def fetch_top_player_game():
+    player = random.choice(TOP_PLAYERS)
+    print(f"Fetching games from top player: {player}")
+    url = f"https://lichess.org/api/games/user/{player}?max=30&analysed=true&evals=true&perfType=bullet,blitz"
     headers = {"Accept": "application/x-ndjson"}
-    r = requests.get(url, headers=headers, stream=True)
+    r = requests.get(url, headers=headers, stream=True, timeout=15)
     games = []
     for line in r.iter_lines():
         if line:
-            games.append(json.loads(line))
+            try:
+                games.append(json.loads(line))
+            except Exception:
+                pass
     if not games:
-        raise Exception(f"No analysed games found for user: {LICHESS_USERNAME}")
-    return random.choice(games)
+        raise Exception(f"No analysed games found for {player}")
+    print(f"Found {len(games)} games from {player}")
+    return random.choice(games), player
 
 
 def extract_blunder(game):
     analysis = game.get("analysis", [])
-    blunder_move = None
-    blunder_index = -1
-    for i, move_data in enumerate(analysis):
-        if move_data.get("judgment", {}).get("name") in ["Blunder", "Mistake"]:
-            blunder_move = move_data
-            blunder_index = i
-            break
+    blunders = []
+    for i, move in enumerate(analysis):
+        if move.get("judgment", {}).get("name") in ["Blunder", "Mistake"]:
+            blunders.append((i, move))
+    if not blunders:
+        return None
+    blunder_index, blunder_move = random.choice(blunders)
     return {
         "pgn": game.get("pgn", ""),
         "blunder_move": blunder_move,
         "blunder_index": blunder_index,
-        "game_id": game.get("id", "unknown")
+        "game_id": game.get("id", "unknown"),
+        "players": game.get("players", {})
     }
 
 
-def call_openrouter(prompt, tone):
+def call_openrouter(prompt, tone, player):
     model = config.get("openrouter_model", "mistralai/mistral-7b-instruct:free")
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
@@ -65,14 +88,28 @@ def call_openrouter(prompt, tone):
     payload = {
         "model": model,
         "messages": [
-            {"role": "system", "content": "You are a human YouTube Shorts chess creator. Use Hinglish. Respond in the exact OUTPUT format only."},
-            {"role": "user", "content": prompt + f"\n\nTone for this video: {tone}"}
+            {
+                "role": "system",
+                "content": (
+                    "You are a human YouTube Shorts chess creator. "
+                    "Use Hinglish (Hindi + English mix). "
+                    "Respond ONLY in the exact OUTPUT format given, nothing else."
+                )
+            },
+            {
+                "role": "user",
+                "content": (
+                    prompt
+                    + f"\n\nTone for this video: {tone}"
+                    + f"\nThis blunder is from a game by top player: {player}"
+                )
+            }
         ],
         "temperature": 0.9,
         "max_tokens": 500
     }
     print(f"Calling OpenRouter ({model})...")
-    r = requests.post(url, headers=headers, json=payload)
+    r = requests.post(url, headers=headers, json=payload, timeout=30)
     if r.status_code != 200:
         raise Exception(f"OpenRouter error {r.status_code}: {r.text}")
     return r.json()["choices"][0]["message"]["content"]
@@ -96,13 +133,18 @@ def parse_script(raw):
 
 def make_one_video(index=0):
     tone = random.choice(TONES)
-    print(f"Tone: {tone}")
+    print(f"\nTone selected: {tone}")
 
-    game = fetch_lichess_game()
+    # Auto fetch from top players — zero touch
+    game, player = fetch_top_player_game()
     blunder = extract_blunder(game)
-    print(f"Game: {blunder['game_id']} | Blunder at move: {blunder['blunder_index']}")
 
-    raw_script = call_openrouter(PROMPT_TEMPLATE, tone)
+    if not blunder:
+        raise Exception(f"No blunder found in game, retrying...")
+
+    print(f"Game: {blunder['game_id']} | Blunder at move: {blunder['blunder_index']} | Player: {player}")
+
+    raw_script = call_openrouter(PROMPT_TEMPLATE, tone, player)
     script = parse_script(raw_script)
     print("Script:\n", json.dumps(script, indent=2, ensure_ascii=False))
 
@@ -128,7 +170,7 @@ def make_one_video(index=0):
         tags=script.get("HASHTAGS", "").replace("#", "").split()
     )
 
-    print(f"Done! Video {index+1} uploaded.")
+    print(f"Video {index+1} uploaded successfully!")
 
 
 def run_all():
@@ -139,7 +181,7 @@ def run_all():
         try:
             make_one_video(i)
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error on video {i+1}: {e}")
         if i < videos_per_day - 1:
             print(f"Waiting {gap_hours}h...")
             time.sleep(gap_hours * 3600)
@@ -147,8 +189,6 @@ def run_all():
 
 if __name__ == "__main__":
     if "--single" in sys.argv:
-        # GitHub Actions: ek time pe ek video
-        make_one_video(index=int(time.time()) % 1000)
+        make_one_video(index=int(time.time()) % 10000)
     else:
-        # Local: saare videos ek saath
         run_all()
