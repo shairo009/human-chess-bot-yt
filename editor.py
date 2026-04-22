@@ -37,11 +37,12 @@ def convert_gif_to_mp4(gif_path: str, output_path: str) -> str:
     return output_path
 
 
-def add_zoom_effect(input_path: str, output_path: str, start_sec: int = 5) -> str:
+def add_zoom_effect(input_path: str, output_path: str, start_sec: int = 4) -> str:
+    # Faster zoom (from 1 to 1.8) and earlier start for more tension
     cmd = [
         "ffmpeg", "-y", "-i", input_path,
         "-vf", (
-            f"zoompan=z='if(gte(t,{start_sec}),1.5,1)'"
+            f"zoompan=z='if(gte(t,{start_sec}),zoom+0.015,1)'"
             f":x='iw/2-(iw/zoom/2)'"
             f":y='ih/2-(ih/zoom/2)'"
             f":d=1:s=1080x1920:fps=30"
@@ -50,7 +51,7 @@ def add_zoom_effect(input_path: str, output_path: str, start_sec: int = 5) -> st
         output_path
     ]
     subprocess.run(cmd, check=True, capture_output=True)
-    print(f"Zoom added: {output_path}")
+    print(f"Aggressive Zoom added: {output_path}")
     return output_path
 
 
@@ -69,26 +70,6 @@ def add_red_box_and_arrow(input_path: str, output_path: str) -> str:
     return output_path
 
 
-def add_captions(input_path: str, output_path: str, voice_lines: str) -> str:
-    srt_path = f"{OUTPUT_DIR}/captions.srt"
-    lines = [l.strip() for l in voice_lines.strip().split("\n") if l.strip()]
-    with open(srt_path, "w", encoding="utf-8") as f:
-        for i, line in enumerate(lines):
-            start = i * 2
-            end = start + 2
-            f.write(f"{i+1}\n")
-            f.write(f"00:00:{start:02d},000 --> 00:00:{end:02d},000\n")
-            f.write(f"{line}\n\n")
-
-    cmd = [
-        "ffmpeg", "-y", "-i", input_path,
-        "-vf", f"subtitles={srt_path}:force_style='Fontsize=24,PrimaryColour=&H00FFFFFF,Bold=1,Outline=2'",
-        "-c:a", "copy",
-        output_path
-    ]
-    subprocess.run(cmd, check=True, capture_output=True)
-    print(f"Captions added: {output_path}")
-    return output_path
 
 
 def merge_voice_with_video(video_path: str, voice_path: str, output_path: str) -> str:
@@ -161,10 +142,7 @@ def create_video(
     voiced = f"{OUTPUT_DIR}/voiced_{game_id}.mp4"
     merge_voice_with_video(boxed, voice_file, voiced)
 
-    captioned = f"{OUTPUT_DIR}/captioned_{game_id}.mp4"
-    add_captions(voiced, captioned, voice_lines=edit_plan)
-
     import shutil
-    shutil.copy(captioned, output_path)
+    shutil.copy(voiced, output_path)
     print(f"Final video ready: {output_path}")
     return output_path

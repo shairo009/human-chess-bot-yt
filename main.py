@@ -4,9 +4,12 @@ import random
 import sys
 import time
 import requests
+from dotenv import load_dotenv
 from voice import generate_voice
 from editor import create_video
 from uploader import upload_to_youtube
+
+load_dotenv()
 
 with open("config.json") as f:
     config = json.load(f)
@@ -14,7 +17,11 @@ with open("config.json") as f:
 with open("prompt.txt") as f:
     PROMPT_TEMPLATE = f.read()
 
-TONES = ["Shock 😱", "Funny 😂", "Savage 😈", "Smart 😎"]
+TONES = [
+    "Toxic Pro 🎮", "Hacker Mind 🧠", "Funny Noob 😂", "Sigma Rule 🗿", 
+    "Drama King 🎭", "Rage Master 😡", "Chill Pro 😎", "Evil Genius 😈", 
+    "Memer 🤡", "Desi Gamer 🇮🇳"
+]
 
 OPENROUTER_API_KEY  = os.environ.get("OPENROUTER_API_KEY", "")
 ELEVENLABS_API_KEY  = os.environ.get("ELEVENLABS_API_KEY", "")
@@ -163,14 +170,22 @@ def make_one_video(index=0):
         output_path=f"output/video_{index}.mp4"
     )
 
-    upload_to_youtube(
-        video_path=video_file,
-        title=script.get("TITLE", "Chess Blunder 😱")[:100],
-        description=script.get("DESCRIPTION", "") + "\n\n" + script.get("HASHTAGS", ""),
-        tags=script.get("HASHTAGS", "").replace("#", "").split()
-    )
-
-    print(f"Video {index+1} uploaded successfully!")
+    # Metadata Jitter: Randomize emojis and symbols to look human
+    random_emojis = ["♟️", "🔥", "😱", "💀", "👑", "🚀", "💥", "🤖"]
+    jitter = random.choice(random_emojis) + " " + random.choice(random_emojis)
+    
+    final_title = f"{script.get('TITLE', 'Chess Blunder')} {jitter}"[:100]
+    
+    if "--no-upload" in sys.argv:
+        print(f"Skipping upload for video {index+1} (--no-upload is set).")
+    else:
+        upload_to_youtube(
+            video_path=video_file,
+            title=final_title,
+            description=script.get("DESCRIPTION", "") + "\n\n" + script.get("HASHTAGS", "") + "\n\n#Chess #Shorts #Automation",
+            tags=script.get("HASHTAGS", "").replace("#", "").split()
+        )
+        print(f"Video {index+1} uploaded successfully!")
 
 
 def run_all():
