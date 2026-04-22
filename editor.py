@@ -59,8 +59,7 @@ def add_red_box_and_arrow(input_path: str, output_path: str) -> str:
     cmd = [
         "ffmpeg", "-y", "-i", input_path,
         "-vf", (
-            "drawbox=x=200:y=200:w=120:h=120:color=red@0.8:t=4,"
-            "drawtext=text='❌ Blunder':fontcolor=red:fontsize=36:x=200:y=330"
+            "drawbox=x=200:y=200:w=120:h=120:color=red@0.8:t=4"
         ),
         "-c:a", "copy",
         output_path
@@ -126,19 +125,27 @@ def create_video(
 ) -> str:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+    print("Step 1: Fetching board GIF...")
     gif = fetch_board_gif(game_id, blunder_index)
+    print(f"GIF fetched: {gif}")
+
+    print("Step 2: Converting GIF to MP4...")
     raw_mp4 = f"{OUTPUT_DIR}/raw_{game_id}.mp4"
     convert_gif_to_mp4(gif, raw_mp4)
 
+    print("Step 3: Trimming clip...")
     trimmed = f"{OUTPUT_DIR}/trimmed_{game_id}.mp4"
     trim_clip(raw_mp4, trimmed, duration=10)
 
+    print("Step 4: Adding aggressive zoom...")
     zoomed = f"{OUTPUT_DIR}/zoomed_{game_id}.mp4"
     add_zoom_effect(trimmed, zoomed)
 
+    print("Step 5: Adding red box/blunder text...")
     boxed = f"{OUTPUT_DIR}/boxed_{game_id}.mp4"
     add_red_box_and_arrow(zoomed, boxed)
 
+    print("Step 6: Merging voice with video...")
     voiced = f"{OUTPUT_DIR}/voiced_{game_id}.mp4"
     merge_voice_with_video(boxed, voice_file, voiced)
 

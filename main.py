@@ -163,6 +163,7 @@ def make_one_video(index=0):
         api_key=ELEVENLABS_API_KEY
     )
 
+    print(f"Generating video for Game: {blunder['game_id']}...")
     video_file = create_video(
         game_id=blunder["game_id"],
         blunder_index=blunder["blunder_index"],
@@ -170,6 +171,7 @@ def make_one_video(index=0):
         edit_plan=script.get("EDIT_PLAN", ""),
         output_path=f"output/video_{index}.mp4"
     )
+    print(f"Video created: {video_file}")
 
     # Metadata Jitter: Randomize emojis and symbols to look human
     random_emojis = ["♟️", "🔥", "😱", "💀", "👑", "🚀", "💥", "🤖"]
