@@ -142,12 +142,13 @@ def make_one_video(index=0):
     tone = random.choice(TONES)
     print(f"\nTone selected: {tone}")
 
-    # Auto fetch from top players — zero touch
-    game, player = fetch_top_player_game()
-    blunder = extract_blunder(game)
-
-    if not blunder:
-        raise Exception(f"No blunder found in game, retrying...")
+    blunder = None
+    player = None
+    while not blunder:
+        game, player = fetch_top_player_game()
+        blunder = extract_blunder(game)
+        if not blunder:
+            print("No blunder found in this game, retrying with another...")
 
     print(f"Game: {blunder['game_id']} | Blunder at move: {blunder['blunder_index']} | Player: {player}")
 
