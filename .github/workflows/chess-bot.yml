@@ -31,7 +31,7 @@ jobs:
         run: mkdir -p output
 
       - name: Restore YouTube token
-        run: echo '${{ secrets.YOUTUBE_TOKEN_JSON }}' > youtube_token.json
+        run: echo '${{ secrets.YOUTUBE_TOKEN_JSON }}' > token.json
 
       - name: Run Chess Bot (single video)
         env:
